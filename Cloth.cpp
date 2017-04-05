@@ -438,7 +438,35 @@ void cCloth::IntegrateImplicit(double timestep, const Eigen::VectorXd& X, const 
 								Eigen::VectorXd& out_X, Eigen::VectorXd& out_V)
 {
 	// TODO (CPSC426): Implement implicit euler
-	BuildJacobian(X, V, mJ); // build Jacobian and store it in mJ
+	//SparseMatrix<double> mJ(X.size,V.size) ;
+	VectorXd xp, vp, y, yp, dy, b, x;
+
+	EvalDerivative(X, V, xp, vp);
+
+	y.resize(xp.size() + vp.size());
+	y << xp, vp;
+	yp = y.transpose();
+	b = timestep * yp;
+
+	int dim = b.size();
+
+	//cout << "size of b:" << b.size() << "\n";
+
+	SparseMatrix<double> ident, A;
+	ident.resize(dim, dim);
+	ident.setIdentity();
+
+	A = ident - timestep*mJ;
+	mSolver.analyzePattern(A);
+	mSolver.factorize(A);
+
+	x.resize(dim);
+	x = mSolver.solve(b);
+
+	//cout << "x:" << x << "\n";
+
+	out_X = X + x.head(xp.size());
+	out_V = V + x.tail(vp.size());
 }
 
 void cCloth::EvalDerivative(const Eigen::VectorXd& X, const Eigen::VectorXd& V, Eigen::VectorXd& out_dX, Eigen::VectorXd& out_dV)
